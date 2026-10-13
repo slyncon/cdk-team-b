@@ -18,12 +18,15 @@ Prerequisites: Python 3.12, Node 24 LTS/npm, Git; AWS CLI v2 only for manual AWS
 Both teams consume the Platform repository at the same tested release:
 
 ```text
-cdk-launchpad @ git+https://github.com/slyncon/partenamut-cdk-use-case.git@v0.1.0
+cdk-launchpad @ git+https://github.com/slyncon/partenamut-cdk-use-case.git@b5658184165e16aeac462114a229636ba29b23f7
 ```
 
 The Python distribution is `cdk-launchpad`; its imports use `cdk_launchpad`.
 No package registry, AWS credentials, or GitHub Secrets are needed to install a
-public tagged source dependency. The dependency is a regular installation from the Platform release, independent
+public tagged source dependency. Platform 0.1.0 is pinned to its full source commit. Team A pilots automated
+deployment with 0.1.1; this team retains validation-only CI and manual deployment.
+CI actions are pinned and validation includes secret, code, and dependency scans.
+The dependency is a regular installation from the Platform release, independent
 of sibling directories. Local environments and generated assets are ignored by Git.
 
 From this project's root:
@@ -105,25 +108,25 @@ and [Actions billing](https://docs.github.com/en/billing/concepts/product-billin
 
 ## Manual AWS deployment
 
-Use the existing `partenamut-sso` profile, account **851725255087**, deployment region
-**eu-central-1**, and SSO authentication region **eu-west-1**. Check sandbox
+Use an authenticated profile for your personal AWS account and the selected
+deployment region. This team remains manual; Team A is the OIDC deployment pilot. Check sandbox
 billing/budget; small fixtures and short application log retention do not guarantee
-no charges. All commands below are human-operated. Refresh SSO if needed:
+no charges. All commands below are human-operated. Set your personal profile and region first:
 
 ```bash
-aws sso login --profile partenamut-sso
-aws sts get-caller-identity --profile partenamut-sso
-export AWS_REGION=eu-central-1
-export AWS_DEFAULT_REGION=eu-central-1
+export PERSONAL_AWS_PROFILE="<your-personal-account-profile>"
+export AWS_REGION="<your-deployment-region>"
+export AWS_DEFAULT_REGION="$AWS_REGION"
+aws sts get-caller-identity --profile "$PERSONAL_AWS_PROFILE"
 
-cdk synth --profile partenamut-sso
+cdk synth --profile "$PERSONAL_AWS_PROFILE"
 cdk-launchpad-validate .build/cdk.out
 
 # Only if this account/region needs CDK bootstrap resources; skip if already ready.
-cdk bootstrap --profile partenamut-sso
+cdk bootstrap --profile "$PERSONAL_AWS_PROFILE"
 
-cdk diff MedicalDocumentsTeamStack --profile partenamut-sso
-cdk deploy MedicalDocumentsTeamStack --profile partenamut-sso
+cdk diff MedicalDocumentsTeamStack --profile "$PERSONAL_AWS_PROFILE"
+cdk deploy MedicalDocumentsTeamStack --profile "$PERSONAL_AWS_PROFILE"
 ```
 
 Confirm the expected account/region. Review the diff and permission prompt. Stop
@@ -135,15 +138,15 @@ migration. CloudFormation outputs provide actual resource names.
 ```bash
 MEDICAL_BUCKET=$(aws cloudformation describe-stacks --stack-name MedicalDocumentsTeamStack \
   --query "Stacks[0].Outputs[?OutputKey=='BucketName'].OutputValue | [0]" --output text \
-  --profile partenamut-sso --region eu-central-1)
+  --profile "$PERSONAL_AWS_PROFILE" --region "$AWS_REGION")
 MEDICAL_LOG_GROUP=$(aws cloudformation describe-stacks --stack-name MedicalDocumentsTeamStack \
   --query "Stacks[0].Outputs[?OutputKey=='LogGroupName'].OutputValue | [0]" --output text \
-  --profile partenamut-sso --region eu-central-1)
+  --profile "$PERSONAL_AWS_PROFILE" --region "$AWS_REGION")
 
 aws s3 cp fixtures/medical_document.json "s3://$MEDICAL_BUCKET/incoming/medical_document.json" \
-  --profile partenamut-sso --region eu-central-1
+  --profile "$PERSONAL_AWS_PROFILE" --region "$AWS_REGION"
 aws logs tail "$MEDICAL_LOG_GROUP" --since 10m \
-  --profile partenamut-sso --region eu-central-1
+  --profile "$PERSONAL_AWS_PROFILE" --region "$AWS_REGION"
 ```
 
 Stop if an output is empty or `None`. Notifications are asynchronous; wait briefly
@@ -160,20 +163,20 @@ finishing the disposable demo, verify identity and the bucket's actual stack out
 then list its contents before any deletion:
 
 ```bash
-aws sts get-caller-identity --profile partenamut-sso
+aws sts get-caller-identity --profile "$PERSONAL_AWS_PROFILE"
 aws cloudformation describe-stacks --stack-name MedicalDocumentsTeamStack \
   --query 'Stacks[0].Outputs' --output table \
-  --profile partenamut-sso --region eu-central-1
+  --profile "$PERSONAL_AWS_PROFILE" --region "$AWS_REGION"
 aws s3 ls "s3://$MEDICAL_BUCKET/" --recursive \
-  --profile partenamut-sso --region eu-central-1
+  --profile "$PERSONAL_AWS_PROFILE" --region "$AWS_REGION"
 ```
 
 Only after confirming this is the disposable demo bucket:
 
 ```bash
 aws s3 rm "s3://$MEDICAL_BUCKET/" --recursive \
-  --profile partenamut-sso --region eu-central-1
-cdk destroy MedicalDocumentsTeamStack --profile partenamut-sso
+  --profile "$PERSONAL_AWS_PROFILE" --region "$AWS_REGION"
+cdk destroy MedicalDocumentsTeamStack --profile "$PERSONAL_AWS_PROFILE"
 ```
 
 Empty the bucket before deletion. `DESTROY` is demo-only and automatic object

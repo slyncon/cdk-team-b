@@ -1,1 +1,2 @@
-cdk-launchpad @ git+https://github.com/slyncon/partenamut-cdk-use-case.git@v0.1.0
+# Platform 0.1.0 remains selected; pin its immutable source commit.
+cdk-launchpad @ git+https://github.com/slyncon/partenamut-cdk-use-case.git@b5658184165e16aeac462114a229636ba29b23f7
